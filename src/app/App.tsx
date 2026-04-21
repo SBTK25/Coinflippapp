@@ -32,7 +32,7 @@ const THEMES = {
     reset:         "rgba(255,255,255,0.18)",
     toggleBg:      "rgba(255,255,255,0.08)",
     toggleIcon:    "rgba(255,255,255,0.55)",
-    topWashMul:    0.06,
+    topWashMul:    0.13,
   },
   light: {
     bg:            "#FFFFFF",
@@ -64,6 +64,18 @@ function useIsCompact() {
     return () => window.removeEventListener("resize", handler);
   }, []);
   return compact;
+}
+
+function useIsWide() {
+  const [wide, setWide] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth > 1080
+  );
+  useEffect(() => {
+    const handler = () => setWide(window.innerWidth > 1080);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return wide;
 }
 
 // ── Sun icon ─────────────────────────────────────────────────────────────────
@@ -102,6 +114,7 @@ export default function App() {
   const [nextId, setNextId]         = useState(0);
   const [theme, setTheme]           = useState<Theme>("dark");
   const isCompact                   = useIsCompact();
+  const isWide                      = useIsWide();
 
   const T = THEMES[theme];
 
@@ -193,9 +206,10 @@ export default function App() {
         {!isFlipping && !result && (
           <motion.p
             key="idle"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.1 } }}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4, transition: { duration: 0.1 } }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
             style={{ fontSize: "0.58rem", letterSpacing: "0.26em", textTransform: "uppercase", color: T.faint }}
           >
             tap flip to begin
@@ -205,9 +219,10 @@ export default function App() {
         {isFlipping && (
           <motion.div
             key="flipping"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.12 } }}
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.12 } }}
+            transition={{ duration: 0.2 }}
             style={{ display: "flex", flexDirection: "column", alignItems: compact ? "flex-start" : "center", gap: 8 }}
           >
             <motion.p
@@ -232,25 +247,52 @@ export default function App() {
         {!isFlipping && result && (
           <motion.div
             key={`result-${result}`}
-            initial={{ opacity: 0, scale: 0.6, y: 14 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.88, y: -10, transition: { duration: 0.18 } }}
-            transition={{ type: "spring", stiffness: 420, damping: 24, mass: 0.6 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, y: -8, filter: "blur(6px)", transition: { duration: 0.2 } }}
+            transition={{ duration: 0.15 }}
             style={{ display: "flex", flexDirection: "column", alignItems: compact ? "flex-start" : "center", gap: 4 }}
           >
-            <p style={{
-              fontSize: "0.52rem", letterSpacing: "0.28em", textTransform: "uppercase",
-              color: accentColor, opacity: 0.6, margin: 0,
-            }}>
+            <motion.p
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 0.6, y: 0 }}
+              transition={{ delay: 0.05, duration: 0.35, ease: "easeOut" }}
+              style={{
+                fontSize: "0.52rem", letterSpacing: "0.28em", textTransform: "uppercase",
+                color: accentColor, margin: 0,
+              }}
+            >
               Result
-            </p>
-            <p style={{
+            </motion.p>
+            {/* Per-character stagger */}
+            <div style={{ display: "flex", overflow: "hidden",
               fontSize: compact ? "clamp(1.6rem,5svh,2.4rem)" : "clamp(2rem,5.5svh,3.8rem)",
               fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1,
-              color: accentColor, margin: 0, transition: "color 0.35s",
+              color: T.primary,
             }}>
-              {result === "heads" ? "Heads" : "Tails"}
-            </p>
+              {(result === "heads" ? "Heads" : "Tails").split("").map((char, i) => (
+                <motion.span
+                  key={`${result}-${i}`}
+                  initial={{ opacity: 0, y: "60%", filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: "0%", filter: "blur(0px)" }}
+                  transition={{ delay: 0.08 + i * 0.045, duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  {char}
+                </motion.span>
+              ))}
+            </div>
+            {/* Glow pulse under the word */}
+            <motion.div
+              initial={{ opacity: 0, scaleX: 0.4 }}
+              animate={{ opacity: [0, 0.35, 0], scaleX: [0.4, 1.1, 1.4] }}
+              transition={{ delay: 0.3, duration: 0.9, ease: "easeOut" }}
+              style={{
+                position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)",
+                width: "70%", height: 10, borderRadius: "50%",
+                background: `radial-gradient(ellipse at center, rgba(${accentRgb},0.55) 0%, transparent 70%)`,
+                pointerEvents: "none",
+              }}
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -258,43 +300,89 @@ export default function App() {
   );
 
   // ── Flip button ───────────────────────────────────────────────────────────
-  const FlipButton = (compact: boolean) => (
-    <div style={{ flexShrink: 0 }}>
-      <motion.button
-        onClick={flip}
-        disabled={isFlipping}
-        whileTap={!isFlipping ? { scale: 0.97 } : {}}
-        style={{
-          width: "100%",
-          height: compact ? "clamp(36px,5svh,44px)" : "clamp(40px,6svh,62px)",
-          borderRadius: 999,
-          border: `1.5px solid ${!isFlipping && hasResult ? `rgba(${accentRgb},0.5)` : T.border}`,
-          background: !isFlipping && hasResult ? `rgba(${accentRgb},0.1)` : T.btnBg,
-          cursor: isFlipping ? "default" : "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-          opacity: isFlipping ? 0.35 : 1,
-          transition: "border 0.45s, background 0.45s, opacity 0.2s",
-          position: "relative", overflow: "hidden",
-        }}
-      >
-        <svg
-          width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke={!isFlipping && hasResult ? accentColor : T.reset}
-          strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-          style={{ transition: "stroke 0.45s", flexShrink: 0 }}>
-          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-          <path d="M3 3v5h5" />
-        </svg>
-        <span style={{
-          fontSize: "0.7rem", letterSpacing: "0.22em", textTransform: "uppercase", fontWeight: 600,
-          color: !isFlipping && hasResult ? accentColor : T.reset,
-          transition: "color 0.45s",
-        }}>
-          {hasResult ? "Flip Again" : "Flip"}
-        </span>
-      </motion.button>
-    </div>
-  );
+  const FlipButton = (compact: boolean) => {
+    const btnAccentRgb   = result === "tails" ? TAILS_RGB   : HEADS_RGB;
+    const btnBorder = hasResult
+      ? `1.5px solid rgba(${btnAccentRgb},0.35)`
+      : theme === "dark"
+        ? `1.5px solid rgba(255,255,255,0.25)`
+        : `1.5px solid rgba(0,0,0,0.18)`;
+    const iconColor  = theme === "dark" ? "#000000" : "#ffffff";
+    const labelColor = theme === "dark" ? "#000000" : "#ffffff";
+    const btnBg      = theme === "dark" ? "rgba(255,255,255,0.93)" : "#000000";
+    const btnShadow = hasResult
+      ? `0 0 18px rgba(${btnAccentRgb},0.22), 0 2px 12px rgba(0,0,0,0.10)`
+      : "0 2px 12px rgba(0,0,0,0.10)";
+
+    return (
+      <motion.div layout style={{ flexShrink: 0 }}>
+        <motion.button
+          onClick={flip}
+          disabled={isFlipping}
+          whileHover={!isFlipping ? { scale: 1.025 } : {}}
+          whileTap={!isFlipping ? { scale: 0.96 } : {}}
+          animate={{ boxShadow: btnShadow }}
+          transition={{ duration: 0.55 }}
+          style={{
+            width: "100%",
+            height: compact ? "clamp(36px,5svh,44px)" : "clamp(40px,6svh,62px)",
+            borderRadius: 999,
+            border: btnBorder,
+            background: btnBg,
+            cursor: isFlipping ? "default" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            opacity: isFlipping ? 0.35 : 1,
+            transition: "border 0.45s, opacity 0.2s, background 0.45s",
+            position: "relative", overflow: "hidden",
+          }}
+        >
+          {/* Accent tint overlay */}
+          <motion.div
+            animate={{ opacity: hasResult ? 1 : 0 }}
+            transition={{ duration: 0.55 }}
+            style={{
+              position: "absolute", inset: 0, borderRadius: 999, pointerEvents: "none",
+              background: `linear-gradient(135deg, transparent 0%, rgba(${btnAccentRgb},0.22) 100%)`,
+            }}
+          />
+          {/* Rotating refresh icon */}
+          <motion.svg
+            width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke={iconColor}
+            strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+            animate={isFlipping ? { rotate: 360 } : { rotate: 0 }}
+            transition={isFlipping
+              ? { duration: 0.7, repeat: Infinity, ease: "linear" }
+              : { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }
+            }
+            style={{ flexShrink: 0, position: "relative", zIndex: 1 }}
+          >
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+          </motion.svg>
+          {/* Sliding label */}
+          <div style={{ position: "relative", overflow: "hidden", height: "1em", zIndex: 1 }}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={hasResult ? "again" : "flip"}
+                initial={{ y: "100%", opacity: 0 }}
+                animate={{ y: "0%", opacity: 1 }}
+                exit={{ y: "-100%", opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.32, 0, 0.16, 1] }}
+                style={{
+                  display: "block",
+                  fontSize: "0.7rem", letterSpacing: "0.22em", textTransform: "uppercase", fontWeight: 600,
+                  color: labelColor,
+                }}
+              >
+                {hasResult ? "Flip Again" : "Flip"}
+              </motion.span>
+            </AnimatePresence>
+          </div>
+        </motion.button>
+      </motion.div>
+    );
+  };
 
   // ── Dot strip ─────────────────────────────────────────────────────────────
   const DotStrip = (compact: boolean) => (
@@ -334,26 +422,87 @@ export default function App() {
     </div>
   );
 
-  // ── History panel ─────────────────────────────────────────────────────────
+  // ── History panel ───────────────────────────────────────────────────────
   const HistoryPanel = (compact: boolean) => (
     <AnimatePresence>
       {hasHistory && (
         <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.35 }}
-          style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: compact ? 4 : 7 }}
+          initial={{ opacity: 0, y: 12, filter: "blur(8px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          exit={{ opacity: 0, y: -6, filter: "blur(4px)", transition: { duration: 0.22 } }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 24 }}
         >
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+          {/* Stats row — above the dot matrix */}
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", width: "100%" }}>
+            {/* Total flips */}
             <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-              <span style={{ fontSize: "1.1rem", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.02em", color: T.primary }}>
-                {history.length}
-              </span>
+              <div style={{ overflow: "hidden", lineHeight: 1 }}>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={`total-${history.length}`}
+                    initial={{ y: "100%", opacity: 0 }}
+                    animate={{ y: "0%", opacity: 1 }}
+                    exit={{ y: "-100%", opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.32, 0, 0.16, 1] }}
+                    style={{ display: "block", fontSize: "1.1rem", fontWeight: 600, letterSpacing: "-0.02em", color: T.primary }}
+                  >
+                    {history.length}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
               <span style={{ fontSize: "1.1rem", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.02em", color: T.secondary }}>
                 flips
               </span>
             </div>
+            <span style={{ fontSize: "0.65rem", color: T.divider, lineHeight: 1, userSelect: "none" }}>·</span>
+            {/* Heads */}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+              <div style={{ overflow: "hidden", lineHeight: 1 }}>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={`heads-${headsCount}`}
+                    initial={{ y: "100%", opacity: 0 }}
+                    animate={{ y: "0%", opacity: 1 }}
+                    exit={{ y: "-100%", opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.32, 0, 0.16, 1] }}
+                    style={{ display: "block", fontSize: "1.1rem", fontWeight: 600, letterSpacing: "-0.02em", color: HEADS_COLOR }}
+                  >
+                    {headsCount}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+              <span style={{ fontSize: "1.1rem", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.02em", color: HEADS_COLOR, opacity: 0.5 }}>
+                heads
+              </span>
+            </div>
+            <span style={{ fontSize: "0.65rem", color: T.divider, lineHeight: 1, userSelect: "none" }}>·</span>
+            {/* Tails */}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+              <div style={{ overflow: "hidden", lineHeight: 1 }}>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={`tails-${tailsCount}`}
+                    initial={{ y: "100%", opacity: 0 }}
+                    animate={{ y: "0%", opacity: 1 }}
+                    exit={{ y: "-100%", opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.32, 0, 0.16, 1] }}
+                    style={{ display: "block", fontSize: "1.1rem", fontWeight: 600, letterSpacing: "-0.02em", color: TAILS_COLOR }}
+                  >
+                    {tailsCount}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+              <span style={{ fontSize: "1.1rem", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.02em", color: TAILS_COLOR, opacity: 0.5 }}>
+                tails
+              </span>
+            </div>
+          </div>
+
+          {DotStrip(compact)}
+
+          {/* Reset — below the dot matrix */}
+          <div style={{ display: "flex", justifyContent: "center" }}>
             <motion.button
               onClick={reset}
               disabled={isFlipping}
@@ -369,7 +518,6 @@ export default function App() {
               Reset
             </motion.button>
           </div>
-          {DotStrip(compact)}
         </motion.div>
       )}
     </AnimatePresence>
@@ -387,7 +535,7 @@ export default function App() {
         fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
       }}
     >
-      {/* Ambient colour wash */}
+      {/* Ambient colour wash — top edge */}
       <motion.div
         animate={{
           opacity: hasResult ? 1 : 0,
@@ -398,6 +546,34 @@ export default function App() {
         transition={{ duration: 0.8, ease: "easeOut" }}
         style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}
       />
+
+      {/* Dark-theme radial coin aura */}
+      {theme === "dark" && (
+        <motion.div
+          animate={{
+            opacity: hasResult ? 1 : 0,
+            background: result === "tails"
+              ? `radial-gradient(ellipse 72% 55% at 50% 42%, rgba(${TAILS_RGB},0.18) 0%, rgba(${TAILS_RGB},0.06) 40%, transparent 70%)`
+              : `radial-gradient(ellipse 72% 55% at 50% 42%, rgba(${HEADS_RGB},0.18) 0%, rgba(${HEADS_RGB},0.06) 40%, transparent 70%)`,
+          }}
+          transition={{ duration: 1.1, ease: "easeOut" }}
+          style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}
+        />
+      )}
+
+      {/* Dark-theme bottom counter-glow */}
+      {theme === "dark" && (
+        <motion.div
+          animate={{
+            opacity: hasResult ? 0.65 : 0,
+            background: result === "tails"
+              ? `radial-gradient(ellipse 60% 30% at 50% 100%, rgba(${TAILS_RGB},0.12) 0%, transparent 70%)`
+              : `radial-gradient(ellipse 60% 30% at 50% 100%, rgba(${HEADS_RGB},0.12) 0%, transparent 70%)`,
+          }}
+          transition={{ duration: 1.2, ease: "easeOut" }}
+          style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}
+        />
+      )}
 
       <AnimatePresence mode="wait" initial={false}>
 
@@ -412,7 +588,7 @@ export default function App() {
             style={{
               width: "100%", height: "100%",
               display: "flex", flexDirection: "row",
-              padding: "8px 14px", boxSizing: "border-box", gap: 12,
+              padding: "clamp(6px,1.2svh,16px) clamp(10px,2svw,24px)", boxSizing: "border-box", gap: "clamp(8px,1.8svw,24px)",
               position: "relative", zIndex: 1,
             }}
           >
@@ -432,7 +608,7 @@ export default function App() {
             <div style={{
               flex: 1, minWidth: 0,
               display: "flex", flexDirection: "column",
-              justifyContent: "center", gap: 32, overflow: "hidden",
+              justifyContent: "center", gap: "clamp(14px,3.5svh,40px)", overflow: "hidden",
             }}>
               {/* Row 1: Result text (left) + Theme toggle (right) */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -451,8 +627,81 @@ export default function App() {
           </motion.div>
         )}
 
+        {/* ── WIDE (>1080px) ── */}
+        {!isCompact && isWide && (
+          <motion.div
+            key="wide"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.32, ease: [0.32, 0, 0.16, 1] }}
+            style={{
+              width: "100%", height: "100%",
+              display: "flex", flexDirection: "row",
+              position: "relative", zIndex: 1,
+            }}
+          >
+            {/* Theme toggle — fixed top-right */}
+            <div style={{ position: "absolute", top: 36, right: 40, zIndex: 10 }}>
+              {ThemeToggle}
+            </div>
+
+            {/* Left panel — coin + result */}
+            <div style={{
+              flex: "0 0 50%", height: "100%",
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center",
+              gap: "clamp(28px,4svh,56px)",
+              padding: "60px clamp(40px,5vw,100px)",
+              boxSizing: "border-box",
+            }}>
+              <div style={{
+                width: "min(34svh, 300px, 80%)",
+                height: "min(34svh, 300px)",
+                flexShrink: 0,
+              }}>
+                <Coin result={result} isFlipping={isFlipping} theme={theme} />
+              </div>
+              {ResultArea(false)}
+            </div>
+
+            {/* Vertical divider */}
+            <div style={{
+              width: 1,
+              alignSelf: "stretch",
+              background: T.divider,
+              flexShrink: 0,
+              margin: "60px 0",
+            }} />
+
+            {/* Right panel — flip button + history */}
+            <div style={{
+              flex: "0 0 50%", height: "100%",
+              display: "flex", flexDirection: "column",
+              justifyContent: "center",
+              padding: "60px clamp(40px,5vw,100px)",
+              boxSizing: "border-box",
+              gap: "clamp(24px,3.5svh,48px)",
+            }}>
+              {/* App label */}
+              <div>
+                <p style={{
+                  fontSize: "0.52rem", letterSpacing: "0.3em", textTransform: "uppercase",
+                  color: T.faint, margin: 0,
+                }}>
+                  Coin Flipper
+                </p>
+              </div>
+
+              {FlipButton(false)}
+
+              {HistoryPanel(false)}
+            </div>
+          </motion.div>
+        )}
+
         {/* ── PORTRAIT ── */}
-        {!isCompact && (
+        {!isCompact && !isWide && (
           <motion.div
             key="portrait"
             initial={{ opacity: 0, x: 24 }}
@@ -470,26 +719,32 @@ export default function App() {
               {Header}
             </div>
 
-            <div style={{
-              flex: 1, minHeight: 0,
-              display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center",
-              gap: 48,
-            }}>
-              <div style={{ width: "min(28svh, 220px, 100%)", height: "min(28svh, 220px)", flexShrink: 0 }}>
+            <motion.div
+              layout
+              transition={{ layout: { type: "spring", stiffness: 320, damping: 32, mass: 0.8 } }}
+              style={{
+                flex: 1, minHeight: 0,
+                display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center",
+                gap: "clamp(28px,5.5svh,80px)",
+              }}
+            >
+              <motion.div layout transition={{ layout: { type: "spring", stiffness: 320, damping: 32, mass: 0.8 } }} style={{ width: "min(28svh, 220px, 100%)", height: "min(28svh, 220px)", flexShrink: 0 }}>
                 <Coin result={result} isFlipping={isFlipping} theme={theme} />
-              </div>
+              </motion.div>
 
-              {ResultArea(false)}
+              <motion.div layout transition={{ layout: { type: "spring", stiffness: 320, damping: 32, mass: 0.8 } }} style={{ flexShrink: 0 }}>
+                {ResultArea(false)}
+              </motion.div>
 
-              <div style={{ width: "100%", flexShrink: 0 }}>
+              <motion.div layout transition={{ layout: { type: "spring", stiffness: 320, damping: 32, mass: 0.8 } }} style={{ width: "100%", flexShrink: 0 }}>
                 {FlipButton(false)}
-              </div>
+              </motion.div>
 
-              <div style={{ width: "100%", flexShrink: 0 }}>
+              <motion.div layout transition={{ layout: { type: "spring", stiffness: 320, damping: 32, mass: 0.8 } }} style={{ width: "100%", flexShrink: 0 }}>
                 {HistoryPanel(false)}
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </motion.div>
         )}
 
