@@ -1,7 +1,7 @@
 
-  # Coin Flipper App
+  # Untitled
 
-  This is a code bundle for Coin Flipper App. The original project is available at https://www.figma.com/design/rbJ6a2MxglPFKnuZWUa5Zj/Coin-Flipper-App.
+  This is a code bundle for Untitled. The original project is available at https://www.figma.com/design/rbJ6a2MxglPFKnuZWUa5Zj/Untitled.
 
   ## Running the code
 

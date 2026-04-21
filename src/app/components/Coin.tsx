@@ -95,6 +95,7 @@ export function Coin({ result, isFlipping, theme }: CoinProps) {
     <div style={{ width: "100%", height: "100%", perspective: 900 }}>
       <motion.div
         animate={controls}
+        initial={{ rotateY: !isFlipping && isTails ? 180 : 0, y: 0, scale: 1 }}
         style={{ width: "100%", height: "100%", transformStyle: "preserve-3d", position: "relative" }}
       >
         <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden" }}>
